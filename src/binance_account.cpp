@@ -3,37 +3,37 @@
 using namespace binance;
 using namespace std;
 
-binanceError_t binance::Account::getInfo(string& result, const string& url)
+binanceError_t binance::Account::getInfo(string& result, const vector<pair<string, string> >& args)
 {
 	return binanceSuccess;
 }
 
-binanceError_t binance::Account::getAllOrders(string& result, const string& url)
+binanceError_t binance::Account::getAllOrders(string& result, const vector<pair<string, string> >& args)
 {
 	return binanceSuccess;
 }
 
-binanceError_t binance::Account::getHistoricalTrades(string& result, const string& url)
+binanceError_t binance::Account::getHistoricalTrades(string& result, const vector<pair<string, string> >& args)
 {
 	return binanceSuccess;
 }
 
-binanceError_t binance::Account::getTrades(string& result, const string& url)
+binanceError_t binance::Account::getTrades(string& result, const vector<pair<string, string> >& args)
 {
 	return binanceSuccess;
 }
 
-binanceError_t binance::Account::getOpenOrders(string& result, const string& url)
+binanceError_t binance::Account::getOpenOrders(string& result, const vector<pair<string, string> >& args)
 {
 	return binanceSuccess;
 }
 
-binanceError_t binance::Account::sendOrder(string& result, const string& url)
+binanceError_t binance::Account::sendOrder(string& result, const vector<pair<string, string> >& args)
 {
 	return binanceSuccess;
 }
 
-binanceError_t binance::Account::startUserDataStream(string& result, const string& url)
+binanceError_t binance::Account::startUserDataStream(string& result, const vector<pair<string, string> >& args)
 {
 	return binanceSuccess;
 }

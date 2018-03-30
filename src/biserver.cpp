@@ -22,6 +22,15 @@ static bool startsWith(const string& what, const string& with)
 	return (what.compare(0, with.length(), with) == 0);
 }
 
+static int callback_arguments(void *cls, enum MHD_ValueKind kind, const char *key, const char *value)
+{
+	vector<pair<string, string> >* args = (vector<pair<string, string> >*)cls;
+	
+	args->push_back(pair<string, string>(key, value));
+	
+	return MHD_YES;
+}
+
 static int callback(void* cls, struct MHD_Connection* connection,
 	const char* curl, const char* method, const char* version,
 	const char* upload_data, size_t* upload_data_size, void** ptr)
@@ -48,6 +57,9 @@ static int callback(void* cls, struct MHD_Connection* connection,
 		if (url != APIprefix)
 			return MHD_HTTP_NOT_FOUND;
 	}
+
+	vector<pair<string, string> > args;
+	MHD_get_connection_values(connection, MHD_GET_ARGUMENT_KIND, &callback_arguments, (void*)&args);
 	
 	string url(curl + sizeof(APIprefix) - 1);
 	string result;
@@ -64,11 +76,11 @@ static int callback(void* cls, struct MHD_Connection* connection,
 		}
 		else if (startsWith(url, "1/ticker/24hr"))
 		{
-			BINANCE_ERR_CHECK(binance::Market::get24hr(result, url));
+			BINANCE_ERR_CHECK(binance::Market::get24hr(result, args));
 		}
 		else if (startsWith(url, "1/aggTrades"))
 		{
-			BINANCE_ERR_CHECK(binance::Market::getAggTrades(result, url));
+			BINANCE_ERR_CHECK(binance::Market::getAggTrades(result, args));
 		}
 		else if (url == "1/ticker/allBookTickers")
 		{
@@ -80,23 +92,23 @@ static int callback(void* cls, struct MHD_Connection* connection,
 		}
 		else if (startsWith(url, "1/depth"))
 		{
-			BINANCE_ERR_CHECK(binance::Market::getDepth(result, url));
+			BINANCE_ERR_CHECK(binance::Market::getDepth(result, args));
 		}
 		else if (startsWith(url, "1/historicalTrades"))
 		{
-			BINANCE_ERR_CHECK(binance::Account::getHistoricalTrades(result, url));
+			BINANCE_ERR_CHECK(binance::Account::getHistoricalTrades(result, args));
 		}
 		else if (startsWith(url, "1/klines"))
 		{
-			BINANCE_ERR_CHECK(binance::Market::getKlines(result, url));
+			BINANCE_ERR_CHECK(binance::Market::getKlines(result, args));
 		}
 		else if (startsWith(url, "1/trades"))
 		{
-			BINANCE_ERR_CHECK(binance::Account::getTrades(result, url));
+			BINANCE_ERR_CHECK(binance::Account::getTrades(result, args));
 		}
 		else if (startsWith(url, "1/userDataStream"))
 		{
-			BINANCE_ERR_CHECK(binance::Account::startUserDataStream(result, url));
+			BINANCE_ERR_CHECK(binance::Account::startUserDataStream(result, args));
 		}
 		else
 		{
@@ -107,23 +119,23 @@ static int callback(void* cls, struct MHD_Connection* connection,
 	{
 		if (startsWith(url, "3/account"))
 		{
-			BINANCE_ERR_CHECK(binance::Account::getInfo(result, url));
+			BINANCE_ERR_CHECK(binance::Account::getInfo(result, args));
 		}
 		else if (startsWith(url, "3/allOrders"))
 		{
-			BINANCE_ERR_CHECK(binance::Account::getAllOrders(result, url));
+			BINANCE_ERR_CHECK(binance::Account::getAllOrders(result, args));
 		}
 		else if (startsWith(url, "3/myTrades"))
 		{
-			BINANCE_ERR_CHECK(binance::Account::getTrades(result, url));
+			BINANCE_ERR_CHECK(binance::Account::getTrades(result, args));
 		}
 		else if (startsWith(url, "3/openOrders"))
 		{
-			BINANCE_ERR_CHECK(binance::Account::getOpenOrders(result, url));
+			BINANCE_ERR_CHECK(binance::Account::getOpenOrders(result, args));
 		}
 		else if (startsWith(url, "3/order"))
 		{
-			BINANCE_ERR_CHECK(binance::Account::sendOrder(result, url));
+			BINANCE_ERR_CHECK(binance::Account::sendOrder(result, args));
 		}
 		else
 		{
