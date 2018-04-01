@@ -17,6 +17,50 @@ binanceError_t binance::Market::get24hr(string& result, const vector<pair<string
 {
 	if (args.size() == 0) return get24hr(result);
 	
+	string symbol = "";
+	
+	int hasUnknownArgs = 0;
+	for (int i = 0, e = args.size(); i != e; i++)
+	{
+		const pair<string, string>& arg = args[i];
+
+		if (arg.first == "symbol")
+		{
+			if (symbol != "")
+			{
+				result = "{\"code\":-1101,\"msg\":\"Duplicate values for a parameter detected.\"}";
+				return binanceSuccess;
+			}
+
+			while (1)
+			{
+				if (arg.second.size() > 20) goto failure;
+
+				for (int i = 0, e = arg.second.size(); i != e; i++)
+				{
+					if ((isupper(arg.second[i])) || (isdigit(arg.second[i])))
+						continue;
+			
+					goto failure;
+				}
+		
+				break;
+		
+			failure :
+		
+				result = "{\"code\":-1100,\"msg\":\"Illegal characters found in parameter 'symbol'; "
+					"legal range is '^[A-Z0-9_]{1,20}$'.\"}";
+				return binanceSuccess;
+			}
+			
+			symbol = arg.second; 
+		}
+		else
+		{
+			hasUnknownArgs++;
+		}
+	}
+
 	if (args.size() != 1)
 	{
 		stringstream ss;
@@ -26,16 +70,20 @@ binanceError_t binance::Market::get24hr(string& result, const vector<pair<string
 		result = ss.str();
 		return binanceSuccess;
 	}
-	
-	if (args[0].first == "symbol")
+
+	if (hasUnknownArgs)
 	{
-		return get24hr(result, args[0].second.c_str());
-	}
-	else
-	{
-		result = "{\"code\":-1104,\"msg\":\"Not all sent parameters were read; read '0' parameter(s) but was sent '1'.\"}";
+		stringstream ss;
+		ss << "{\"code\":-1104,\"msg\":\"Not all sent parameters were read; read '";
+		ss << args.size() - hasUnknownArgs;
+		ss << "' parameter(s) but was sent '";
+		ss << args.size();
+		ss << "'.\"}";
+		result = ss.str();
 		return binanceSuccess;
 	}
+
+	return get24hr(result, args[0].second.c_str());
 
 	return binanceSuccess;
 }
@@ -74,6 +122,7 @@ binanceError_t binance::Market::getAggTrades(string& result, const vector<pair<s
 	time_t startTime = numeric_limits<time_t>::max();
 	time_t endTime = numeric_limits<time_t>::max();
 
+	int hasUnknownArgs = 0;
 	for (int i = 0, e = args.size(); i != e; i++)
 	{
 		const pair<string, string> arg = args[i];
@@ -96,10 +145,25 @@ binanceError_t binance::Market::getAggTrades(string& result, const vector<pair<s
 				return binanceSuccess;
 			}
 
-			if (!(stringstream(arg.second) >> fromId))
+			while (1)
 			{
+				if (arg.second.size() > 20) goto failure;
+
+				for (int i = 0, e = arg.second.size(); i != e; i++)
+				{
+					if (isdigit(arg.second[i]))
+						continue;
+			
+					goto failure;
+				}
+		
+				if ((stringstream(arg.second) >> fromId))
+					break;
+		
+			failure :
+		
 				result = "{\"code\":-1100,\"msg\":\"Illegal characters found in parameter 'fromId'; "
-					" legal range is '^[0-9]{1,20}$'.\"}";
+					"legal range is '^[0-9]{1,20}$'.\"}";
 				return binanceSuccess;
 			}
 		}
@@ -111,10 +175,25 @@ binanceError_t binance::Market::getAggTrades(string& result, const vector<pair<s
 				return binanceSuccess;
 			}
 
-			if (!(stringstream(arg.second) >> limit))
+			while (1)
 			{
+				if (arg.second.size() > 20) goto failure1;
+
+				for (int i = 0, e = arg.second.size(); i != e; i++)
+				{
+					if (isdigit(arg.second[i]))
+						continue;
+			
+					goto failure1;
+				}
+		
+				if ((stringstream(arg.second) >> limit))
+					break;
+		
+			failure1 :
+		
 				result = "{\"code\":-1100,\"msg\":\"Illegal characters found in parameter 'limit'; "
-					" legal range is '^[0-9]{1,20}$'.\"}";
+					"legal range is '^[0-9]{1,20}$'.\"}";
 				return binanceSuccess;
 			}
 		}
@@ -126,8 +205,23 @@ binanceError_t binance::Market::getAggTrades(string& result, const vector<pair<s
 				return binanceSuccess;
 			}
 
-			if (!(stringstream(arg.second) >> startTime))
+			while (1)
 			{
+				if (arg.second.size() > 20) goto failure2;
+
+				for (int i = 0, e = arg.second.size(); i != e; i++)
+				{
+					if (isdigit(arg.second[i]))
+						continue;
+			
+					goto failure2;
+				}
+		
+				if ((stringstream(arg.second) >> startTime))
+					break;
+		
+			failure2 :
+		
 				result = "{\"code\":-1100,\"msg\":\"Illegal characters found in parameter 'startTime'; "
 					" legal range is '^[0-9]{1,20}$'.\"}";
 				return binanceSuccess;
@@ -141,8 +235,23 @@ binanceError_t binance::Market::getAggTrades(string& result, const vector<pair<s
 				return binanceSuccess;
 			}
 
-			if (!(stringstream(arg.second) >> endTime))
+			while (1)
 			{
+				if (arg.second.size() > 20) goto failure3;
+
+				for (int i = 0, e = arg.second.size(); i != e; i++)
+				{
+					if (isdigit(arg.second[i]))
+						continue;
+			
+					goto failure3;
+				}
+		
+				if ((stringstream(arg.second) >> endTime))
+					break;
+		
+			failure3 :
+		
 				result = "{\"code\":-1100,\"msg\":\"Illegal characters found in parameter 'endTime'; "
 					" legal range is '^[0-9]{1,20}$'.\"}";
 				return binanceSuccess;
@@ -150,14 +259,25 @@ binanceError_t binance::Market::getAggTrades(string& result, const vector<pair<s
 		}
 		else
 		{
-			result = "{\"code\":-1104,\"msg\":\"Not all sent parameters were read; read '0' parameter(s) but was sent '1'.\"}";
-			return binanceSuccess;
+			hasUnknownArgs++;
 		}
 	}
 
 	if (symbol == "")
 	{
 		result = "{\"code\":-1102,\"msg\":\"Mandatory parameter 'symbol' was not sent, was empty/null, or malformed.\"}";
+		return binanceSuccess;
+	}
+
+	if (hasUnknownArgs)
+	{
+		stringstream ss;
+		ss << "{\"code\":-1104,\"msg\":\"Not all sent parameters were read; read '";
+		ss << args.size() - hasUnknownArgs;
+		ss << "' parameter(s) but was sent '";
+		ss << args.size();
+		ss << "'.\"}";
+		result = ss.str();
 		return binanceSuccess;
 	}
 	
@@ -240,6 +360,7 @@ binanceError_t binance::Market::getDepth(string& result, const vector<pair<strin
 	string symbol = "";
 	int limit = -1;
 
+	int hasUnknownArgs = 0;
 	for (int i = 0, e = args.size(); i != e; i++)
 	{
 		const pair<string, string> arg = args[i];
@@ -249,6 +370,27 @@ binanceError_t binance::Market::getDepth(string& result, const vector<pair<strin
 			if (symbol != "")
 			{
 				result = "{\"code\":-1101,\"msg\":\"Duplicate values for a parameter detected.\"}";
+				return binanceSuccess;
+			}
+
+			while (1)
+			{
+				if (arg.second.size() > 20) goto failure4;
+
+				for (int i = 0, e = arg.second.size(); i != e; i++)
+				{
+					if ((isupper(arg.second[i])) || (isdigit(arg.second[i])))
+						continue;
+			
+					goto failure4;
+				}
+		
+				break;
+		
+			failure4 :
+		
+				result = "{\"code\":-1100,\"msg\":\"Illegal characters found in parameter 'symbol'; "
+					"legal range is '^[A-Z0-9_]{1,20}$'.\"}";
 				return binanceSuccess;
 			}
 			
@@ -262,23 +404,49 @@ binanceError_t binance::Market::getDepth(string& result, const vector<pair<strin
 				return binanceSuccess;
 			}
 
-			if (!(stringstream(arg.second) >> limit))
+			while (1)
 			{
+				if (arg.second.size() > 20) goto failure5;
+
+				for (int i = 0, e = arg.second.size(); i != e; i++)
+				{
+					if (isdigit(arg.second[i]))
+						continue;
+			
+					goto failure5;
+				}
+		
+				if ((stringstream(arg.second) >> limit))
+					break;
+		
+			failure5 :
+		
 				result = "{\"code\":-1100,\"msg\":\"Illegal characters found in parameter 'limit'; "
-					" legal range is '^[0-9]{1,20}$'.\"}";
+					"legal range is '^[0-9]{1,20}$'.\"}";
 				return binanceSuccess;
 			}
 		}
 		else
 		{
-			result = "{\"code\":-1104,\"msg\":\"Not all sent parameters were read; read '0' parameter(s) but was sent '1'.\"}";
-			return binanceSuccess;
+			hasUnknownArgs++;
 		}
 	}
 
 	if (symbol == "")
 	{
 		result = "{\"code\":-1102,\"msg\":\"Mandatory parameter 'symbol' was not sent, was empty/null, or malformed.\"}";
+		return binanceSuccess;
+	}
+
+	if (hasUnknownArgs)
+	{
+		stringstream ss;
+		ss << "{\"code\":-1104,\"msg\":\"Not all sent parameters were read; read '";
+		ss << args.size() - hasUnknownArgs;
+		ss << "' parameter(s) but was sent '";
+		ss << args.size();
+		ss << "'.\"}";
+		result = ss.str();
 		return binanceSuccess;
 	}
 	
@@ -315,6 +483,7 @@ binanceError_t binance::Market::getKlines(string& result, const vector<pair<stri
 	time_t startTime = numeric_limits<time_t>::max();
 	time_t endTime = numeric_limits<time_t>::max();
 
+	int hasUnknownArgs = 0;
 	for (int i = 0, e = args.size(); i != e; i++)
 	{
 		const pair<string, string> arg = args[i];
@@ -350,7 +519,7 @@ binanceError_t binance::Market::getKlines(string& result, const vector<pair<stri
 			if (!(stringstream(arg.second) >> limit))
 			{
 				result = "{\"code\":-1100,\"msg\":\"Illegal characters found in parameter 'limit'; "
-					" legal range is '^[0-9]{1,20}$'.\"}";
+					"legal range is '^[0-9]{1,20}$'.\"}";
 				return binanceSuccess;
 			}
 		}
@@ -386,8 +555,7 @@ binanceError_t binance::Market::getKlines(string& result, const vector<pair<stri
 		}
 		else
 		{
-			result = "{\"code\":-1104,\"msg\":\"Not all sent parameters were read; read '0' parameter(s) but was sent '1'.\"}";
-			return binanceSuccess;
+			hasUnknownArgs++;
 		}
 	}
 
@@ -400,6 +568,18 @@ binanceError_t binance::Market::getKlines(string& result, const vector<pair<stri
 	if (interval == "")
 	{
 		result = "{\"code\":-1102,\"msg\":\"Mandatory parameter 'interval' was not sent, was empty/null, or malformed.\"}";
+		return binanceSuccess;
+	}
+	
+	if (hasUnknownArgs)
+	{
+		stringstream ss;
+		ss << "{\"code\":-1104,\"msg\":\"Not all sent parameters were read; read '";
+		ss << args.size() - hasUnknownArgs;
+		ss << "' parameter(s) but was sent '";
+		ss << args.size();
+		ss << "'.\"}";
+		result = ss.str();
 		return binanceSuccess;
 	}
 	

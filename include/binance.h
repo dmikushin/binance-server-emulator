@@ -44,15 +44,35 @@ namespace binance
 	
 	class Account
 	{
+		static binanceError_t getInfo(std::string& result, long recvWindow = 0);
+		static binanceError_t getAllOrders(std::string& result, const char *symbol,
+			long orderId = 0, int limit = 0, long recvWindow = 0);
+		static binanceError_t getHistoricalTrades(std::string& result, const char *symbol, long fromId = -1, int limit = 500);
+		static binanceError_t getTrades(std::string& result, const char *symbol, int limit = 500);
+		static binanceError_t getTradesSigned(std::string& result, const char *symbol, long fromId = -1,
+			long recvWindow = 0, int limit = 500);
+		static binanceError_t getOpenOrders(std::string& result, long recvWindow = 0);
+		static binanceError_t getOpenOrders(std::string& result, const char *symbol, long recvWindow = 0);
+		static binanceError_t sendOrder(std::string& result, const char *symbol, const char *side, const char *type,
+			const char *timeInForce, double quantity, double price, const char *newClientOrderId, double stopPrice,
+			double icebergQty, long recvWindow);
+
 	public :
 	
-		static binanceError_t getInfo(std::string& result, const std::vector<std::pair<std::string, std::string> >& args);
-		static binanceError_t getAllOrders(std::string& result, const std::vector<std::pair<std::string, std::string> >& args);
-		static binanceError_t getHistoricalTrades(std::string& result, const std::vector<std::pair<std::string, std::string> >& args);
-		static binanceError_t getTrades(std::string& result, const std::vector<std::pair<std::string, std::string> >& args);
-		static binanceError_t getOpenOrders(std::string& result, const std::vector<std::pair<std::string, std::string> >& args);
-		static binanceError_t sendOrder(std::string& result, const std::vector<std::pair<std::string, std::string> >& args);
-		static binanceError_t startUserDataStream(std::string& result, const std::vector<std::pair<std::string, std::string> >& args);
+		static binanceError_t getInfo(std::string& result, const std::vector<std::pair<std::string, std::string> >& args,
+			const std::vector<std::pair<std::string, std::string> >& headers);
+		static binanceError_t getAllOrders(std::string& result, const std::vector<std::pair<std::string, std::string> >& args,
+			const std::vector<std::pair<std::string, std::string> >& headers);
+		static binanceError_t getHistoricalTrades(std::string& result, const std::vector<std::pair<std::string, std::string> >& args,
+			const std::vector<std::pair<std::string, std::string> >& headers);
+		static binanceError_t getTrades(std::string& result, const std::vector<std::pair<std::string, std::string> >& args,
+			const std::vector<std::pair<std::string, std::string> >& headers);
+		static binanceError_t getOpenOrders(std::string& result, const std::vector<std::pair<std::string, std::string> >& args,
+			const std::vector<std::pair<std::string, std::string> >& headers);
+		static binanceError_t sendOrder(std::string& result, const std::vector<std::pair<std::string, std::string> >& args,
+			const std::vector<std::pair<std::string, std::string> >& headers);
+		static binanceError_t startUserDataStream(std::string& result,
+			const std::vector<std::pair<std::string, std::string> >& headers);
 	};
 }
 

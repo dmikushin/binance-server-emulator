@@ -26,9 +26,46 @@ static int callback_arguments(void *cls, enum MHD_ValueKind kind, const char *ke
 {
 	vector<pair<string, string> >* args = (vector<pair<string, string> >*)cls;
 	
-	args->push_back(pair<string, string>(key, value));
+	if (key && value)
+		args->push_back(pair<string, string>(key, value));
+	else
+	{
+		if (!key)
+			args->push_back(pair<string, string>("", value));
+		else if (!value)
+			args->push_back(pair<string, string>(key, ""));
+	}
 	
 	return MHD_YES;
+}
+
+static int callback_headers(void *cls, enum MHD_ValueKind kind, const char *key, const char *value)
+{
+	vector<pair<string, string> >* headers = (vector<pair<string, string> >*)cls;
+	
+	if (key && value)
+		headers->push_back(pair<string, string>(key, value));
+	else
+	{
+		if (!key)
+			headers->push_back(pair<string, string>("", value));
+		else if (!value)
+			headers->push_back(pair<string, string>(key, ""));
+	}
+	
+	return MHD_YES;
+}
+
+static int result_404(struct MHD_Connection* connection)
+{
+	static string message_404 = "<html><body><h2>404 Not found</h2></body></html>";
+	
+	struct MHD_Response* response = MHD_create_response_from_buffer(
+		message_404.size(), &message_404[0], MHD_RESPMEM_MUST_COPY);
+	int ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
+	MHD_destroy_response(response);
+
+	return ret;	
 }
 
 static int callback(void* cls, struct MHD_Connection* connection,
@@ -50,29 +87,45 @@ static int callback(void* cls, struct MHD_Connection* connection,
     }
 
 	if (strlen(curl) <= sizeof(APIprefix) - 1)
-		return MHD_HTTP_NOT_FOUND;
+		return result_404(connection);
 
 	{
 		string url(curl, curl + sizeof(APIprefix) - 1);
 		if (url != APIprefix)
-			return MHD_HTTP_NOT_FOUND;
+			return result_404(connection);
 	}
 
 	vector<pair<string, string> > args;
 	MHD_get_connection_values(connection, MHD_GET_ARGUMENT_KIND, &callback_arguments, (void*)&args);
-	
+
+	vector<pair<string, string> > headers;
+	MHD_get_connection_values(connection, MHD_HEADER_KIND, &callback_headers, (void*)&headers);
+
 	string url(curl + sizeof(APIprefix) - 1);
 	string result;
 	if (url[0] == '1')
 	{
 		if (url == "1/time")
 		{
-			uint64_t value; get_time(&value);
-			stringstream ss;
-			ss << "{\"serverTime\":";
-			ss << value;
-			ss << "}";
-			result = ss.str();
+			if (args.size() != 0)
+			{
+				stringstream ss;
+				ss << "{\"code\":-1101,\"msg\":\"Too many parameters; expected '";
+				ss << 0;
+				ss << "' and received '";
+				ss << args.size();
+				ss << "'.\"}";
+				result = ss.str();
+			}
+			else
+			{
+				uint64_t value; get_time(&value);
+				stringstream ss;
+				ss << "{\"serverTime\":";
+				ss << value;
+				ss << "}";
+				result = ss.str();
+			}
 		}
 		else if (startsWith(url, "1/ticker/24hr"))
 		{
@@ -96,7 +149,7 @@ static int callback(void* cls, struct MHD_Connection* connection,
 		}
 		else if (startsWith(url, "1/historicalTrades"))
 		{
-			BINANCE_ERR_CHECK(binance::Account::getHistoricalTrades(result, args));
+			BINANCE_ERR_CHECK(binance::Account::getHistoricalTrades(result, args, headers));
 		}
 		else if (startsWith(url, "1/klines"))
 		{
@@ -104,51 +157,51 @@ static int callback(void* cls, struct MHD_Connection* connection,
 		}
 		else if (startsWith(url, "1/trades"))
 		{
-			BINANCE_ERR_CHECK(binance::Account::getTrades(result, args));
+			BINANCE_ERR_CHECK(binance::Account::getTrades(result, args, headers));
 		}
 		else if (startsWith(url, "1/userDataStream"))
 		{
-			BINANCE_ERR_CHECK(binance::Account::startUserDataStream(result, args));
+			BINANCE_ERR_CHECK(binance::Account::startUserDataStream(result, headers));
 		}
 		else
 		{
-			return MHD_HTTP_NOT_FOUND;
+			return result_404(connection);
 		}
 	}
 	else if (url[0] == '3')
 	{
 		if (startsWith(url, "3/account"))
 		{
-			BINANCE_ERR_CHECK(binance::Account::getInfo(result, args));
+			BINANCE_ERR_CHECK(binance::Account::getInfo(result, args, headers));
 		}
 		else if (startsWith(url, "3/allOrders"))
 		{
-			BINANCE_ERR_CHECK(binance::Account::getAllOrders(result, args));
+			BINANCE_ERR_CHECK(binance::Account::getAllOrders(result, args, headers));
 		}
 		else if (startsWith(url, "3/myTrades"))
 		{
-			BINANCE_ERR_CHECK(binance::Account::getTrades(result, args));
+			BINANCE_ERR_CHECK(binance::Account::getTrades(result, args, headers));
 		}
 		else if (startsWith(url, "3/openOrders"))
 		{
-			BINANCE_ERR_CHECK(binance::Account::getOpenOrders(result, args));
+			BINANCE_ERR_CHECK(binance::Account::getOpenOrders(result, args, headers));
 		}
 		else if (startsWith(url, "3/order"))
 		{
-			BINANCE_ERR_CHECK(binance::Account::sendOrder(result, args));
+			BINANCE_ERR_CHECK(binance::Account::sendOrder(result, args, headers));
 		}
 		else
 		{
-			return MHD_HTTP_NOT_FOUND;
+			return result_404(connection);
 		}
 	}
 	else
 	{
-		return MHD_HTTP_NOT_FOUND;
+		return result_404(connection);
 	}
 
-	result = "<html><head></head><body><pre style=\"word-wrap: break-word; white-space: pre-wrap;\">"
-		+ result + "</pre></body></html>";
+/*	result = "<html><head></head><body><pre style=\"word-wrap: break-word; white-space: pre-wrap;\">"
+		+ result + "</pre></body></html>";*/
 
     // Reset when done.
     *ptr = NULL;
@@ -160,23 +213,17 @@ static int callback(void* cls, struct MHD_Connection* connection,
     return ret;
 }
 
-int main(int argc, char* argv[])
+static int biserver(int port)
 {
-	if (argc != 2)
-	{
-		printf("%s <port>\n", argv[0]);
-		return 1;
-	}
-
 	struct MHD_Daemon* d = MHD_start_daemon(
 		MHD_USE_SELECT_INTERNALLY | MHD_USE_DEBUG,
-		atoi(argv[1]), NULL, NULL, &callback, NULL,
+		port, NULL, NULL, &callback, NULL,
 		MHD_OPTION_CONNECTION_TIMEOUT, (unsigned int)120,
 		MHD_OPTION_END);
 
 	if (d == NULL)
 	{
-		fprintf(stderr, "Error starting server %s with port %d\n", argv[0], atoi(argv[1]));
+		fprintf(stderr, "Error starting server with port %d\n", port);
 		return 1;
 	}
 
@@ -186,4 +233,29 @@ int main(int argc, char* argv[])
 
 	return 0;
 }
+
+#if !defined(TESTING)
+int main(int argc, char* argv[])
+{
+	if (argc != 2)
+	{
+		printf("%s <port>\n", argv[0]);
+		return 1;
+	}
+	
+	return biserver(atoi(argv[1]));
+}
+#else
+void* biserver_thread(void* arg)
+{
+	if (pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
+		exit(EXIT_FAILURE);
+
+	int port = *(int*)arg;
+
+	biserver(port);
+	
+	return NULL;
+}
+#endif // TESTING
 
