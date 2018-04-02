@@ -3,14 +3,98 @@
 #include <cstring>
 #include <iterator>
 #include <limits>
+#include <map>
 #include <sstream>
 
 using namespace binance;
 using namespace std;
 
-static bool startsWith(const string& what, const string& with)
+static void readValue(const pair<string, string>& arg, string& value, string& result)
 {
-	return (what.compare(0, with.length(), with) == 0);
+	if (value != "")
+	{
+		result = "{\"code\":-1101,\"msg\":\"Duplicate values for a parameter detected.\"}";
+		return;
+	}
+	
+	value = arg.second;
+}
+
+static void checkSymbol(const string& symbol, string& result)
+{
+	while (1)
+	{
+		if ((symbol.size() < 1) || (symbol.size() > 20)) goto failure;
+
+		for (int i = 0, e = symbol.size(); i != e; i++)
+		{
+			if ((isupper(symbol[i])) || (isdigit(symbol[i])))
+				continue;
+	
+			goto failure;
+		}
+
+		break;
+
+	failure :
+
+		result = "{\"code\":-1100,\"msg\":\"Illegal characters found in parameter 'symbol'; "
+			"legal range is '^[A-Z0-9_]{1,20}$'.\"}";
+		return;
+	}
+}
+
+static void checkInterval(const string& interval, string& result)
+{
+	const static string validIntervals[] =
+	{
+		"1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d", "3d", "1w", "1M"
+	};
+
+	bool found = false;
+	for (int i = 0, e = sizeof(validIntervals) / sizeof(validIntervals[0]); i < e; i++)
+	{
+		if (interval == validIntervals[i])
+		{
+			found = true;
+			break;
+		}
+	}
+
+	if (!found)
+	{
+		result = "{\"code\":-1120,\"msg\":\"Invalid interval.\"}";
+		return;
+	}
+}	
+
+template<typename T>
+static void checkInteger(const string& sname, const string& svalue, T& value, string& result)
+{
+	while (1)
+	{
+		if ((svalue.size() < 1) || (svalue.size() > 20)) goto failure;
+
+		for (int i = 0, e = svalue.size(); i != e; i++)
+		{
+			if (isdigit(svalue[i]))
+				continue;
+	
+			goto failure;
+		}
+
+		if ((stringstream(svalue) >> value))
+			break;
+
+	failure :
+
+		stringstream ss;
+		ss << "{\"code\":-1100,\"msg\":\"Illegal characters found in parameter '";
+		ss << sname;
+		ss << "'; legal range is '^[0-9]{1,20}$'.\"}";
+		result = ss.str();
+		return;
+	}
 }
 
 binanceError_t binance::Market::get24hr(string& result, const vector<pair<string, string> >& args)
@@ -19,45 +103,26 @@ binanceError_t binance::Market::get24hr(string& result, const vector<pair<string
 	
 	string symbol = "";
 	
-	int hasUnknownArgs = 0;
+	map<string, string> unknownArgs;
 	for (int i = 0, e = args.size(); i != e; i++)
 	{
 		const pair<string, string>& arg = args[i];
 
 		if (arg.first == "symbol")
 		{
-			if (symbol != "")
+			readValue(arg, symbol, result);
+			if (result != "")
+				return binanceSuccess;
+		}
+		else
+		{
+			if (unknownArgs[arg.first] != "")
 			{
 				result = "{\"code\":-1101,\"msg\":\"Duplicate values for a parameter detected.\"}";
 				return binanceSuccess;
 			}
-
-			while (1)
-			{
-				if (arg.second.size() > 20) goto failure;
-
-				for (int i = 0, e = arg.second.size(); i != e; i++)
-				{
-					if ((isupper(arg.second[i])) || (isdigit(arg.second[i])))
-						continue;
 			
-					goto failure;
-				}
-		
-				break;
-		
-			failure :
-		
-				result = "{\"code\":-1100,\"msg\":\"Illegal characters found in parameter 'symbol'; "
-					"legal range is '^[A-Z0-9_]{1,20}$'.\"}";
-				return binanceSuccess;
-			}
-			
-			symbol = arg.second; 
-		}
-		else
-		{
-			hasUnknownArgs++;
+			unknownArgs[arg.first] = arg.second;
 		}
 	}
 
@@ -71,11 +136,11 @@ binanceError_t binance::Market::get24hr(string& result, const vector<pair<string
 		return binanceSuccess;
 	}
 
-	if (hasUnknownArgs)
+	if (unknownArgs.size())
 	{
 		stringstream ss;
 		ss << "{\"code\":-1104,\"msg\":\"Not all sent parameters were read; read '";
-		ss << args.size() - hasUnknownArgs;
+		ss << args.size() - unknownArgs.size();
 		ss << "' parameter(s) but was sent '";
 		ss << args.size();
 		ss << "'.\"}";
@@ -83,7 +148,11 @@ binanceError_t binance::Market::get24hr(string& result, const vector<pair<string
 		return binanceSuccess;
 	}
 
-	return get24hr(result, args[0].second.c_str());
+	checkSymbol(symbol, result);
+	if (result != "")
+		return binanceSuccess;
+
+	return get24hr(result, symbol.c_str());
 
 	return binanceSuccess;
 }
@@ -117,149 +186,55 @@ binanceError_t binance::Market::getAggTrades(string& result, const vector<pair<s
 	}
 
 	string symbol = "";
-	int fromId = -1;
-	int limit = -1;
-	time_t startTime = numeric_limits<time_t>::max();
-	time_t endTime = numeric_limits<time_t>::max();
+	string fromId = "";
+	string limit = "";
+	string startTime = "";
+	string endTime = "";
 
-	int hasUnknownArgs = 0;
+	map<string, string> unknownArgs;
 	for (int i = 0, e = args.size(); i != e; i++)
 	{
-		const pair<string, string> arg = args[i];
-	
+		const pair<string, string>& arg = args[i];
+
 		if (arg.first == "symbol")
 		{
-			if (symbol != "")
-			{
-				result = "{\"code\":-1101,\"msg\":\"Duplicate values for a parameter detected.\"}";
+			readValue(arg, symbol, result);
+			if (result != "")
 				return binanceSuccess;
-			}
-			
-			symbol = arg.second; 
-		}
+		}	
 		else if (arg.first == "fromId")
 		{
-			if (fromId != -1)
-			{
-				result = "{\"code\":-1101,\"msg\":\"Duplicate values for a parameter detected.\"}";
+			readValue(arg, fromId, result);
+			if (result != "")
 				return binanceSuccess;
-			}
-
-			while (1)
-			{
-				if (arg.second.size() > 20) goto failure;
-
-				for (int i = 0, e = arg.second.size(); i != e; i++)
-				{
-					if (isdigit(arg.second[i]))
-						continue;
-			
-					goto failure;
-				}
-		
-				if ((stringstream(arg.second) >> fromId))
-					break;
-		
-			failure :
-		
-				result = "{\"code\":-1100,\"msg\":\"Illegal characters found in parameter 'fromId'; "
-					"legal range is '^[0-9]{1,20}$'.\"}";
-				return binanceSuccess;
-			}
-		}
+		}	
 		else if (arg.first == "limit")
 		{
-			if (limit != -1)
-			{
-				result = "{\"code\":-1101,\"msg\":\"Duplicate values for a parameter detected.\"}";
+			readValue(arg, limit, result);
+			if (result != "")
 				return binanceSuccess;
-			}
-
-			while (1)
-			{
-				if (arg.second.size() > 20) goto failure1;
-
-				for (int i = 0, e = arg.second.size(); i != e; i++)
-				{
-					if (isdigit(arg.second[i]))
-						continue;
-			
-					goto failure1;
-				}
-		
-				if ((stringstream(arg.second) >> limit))
-					break;
-		
-			failure1 :
-		
-				result = "{\"code\":-1100,\"msg\":\"Illegal characters found in parameter 'limit'; "
-					"legal range is '^[0-9]{1,20}$'.\"}";
-				return binanceSuccess;
-			}
-		}
+		}	
 		else if (arg.first == "startTime")
 		{
-			if (startTime != numeric_limits<time_t>::max())
-			{
-				result = "{\"code\":-1101,\"msg\":\"Duplicate values for a parameter detected.\"}";
+			readValue(arg, startTime, result);
+			if (result != "")
 				return binanceSuccess;
-			}
-
-			while (1)
-			{
-				if (arg.second.size() > 20) goto failure2;
-
-				for (int i = 0, e = arg.second.size(); i != e; i++)
-				{
-					if (isdigit(arg.second[i]))
-						continue;
-			
-					goto failure2;
-				}
-		
-				if ((stringstream(arg.second) >> startTime))
-					break;
-		
-			failure2 :
-		
-				result = "{\"code\":-1100,\"msg\":\"Illegal characters found in parameter 'startTime'; "
-					" legal range is '^[0-9]{1,20}$'.\"}";
-				return binanceSuccess;
-			}
-		}
+		}	
 		else if (arg.first == "endTime")
 		{
-			if (endTime != numeric_limits<time_t>::max())
+			readValue(arg, endTime, result);
+			if (result != "")
+				return binanceSuccess;
+		}	
+		else
+		{
+			if (unknownArgs[arg.first] != "")
 			{
 				result = "{\"code\":-1101,\"msg\":\"Duplicate values for a parameter detected.\"}";
 				return binanceSuccess;
 			}
-
-			while (1)
-			{
-				if (arg.second.size() > 20) goto failure3;
-
-				for (int i = 0, e = arg.second.size(); i != e; i++)
-				{
-					if (isdigit(arg.second[i]))
-						continue;
 			
-					goto failure3;
-				}
-		
-				if ((stringstream(arg.second) >> endTime))
-					break;
-		
-			failure3 :
-		
-				result = "{\"code\":-1100,\"msg\":\"Illegal characters found in parameter 'endTime'; "
-					" legal range is '^[0-9]{1,20}$'.\"}";
-				return binanceSuccess;
-			}
-		}
-		else
-		{
-			hasUnknownArgs++;
+			unknownArgs[arg.first] = arg.second;
 		}
 	}
 
@@ -269,32 +244,71 @@ binanceError_t binance::Market::getAggTrades(string& result, const vector<pair<s
 		return binanceSuccess;
 	}
 
-	if (hasUnknownArgs)
+	if (unknownArgs.size())
 	{
 		stringstream ss;
 		ss << "{\"code\":-1104,\"msg\":\"Not all sent parameters were read; read '";
-		ss << args.size() - hasUnknownArgs;
+		ss << args.size() - unknownArgs.size();
 		ss << "' parameter(s) but was sent '";
 		ss << args.size();
 		ss << "'.\"}";
 		result = ss.str();
 		return binanceSuccess;
 	}
-	
-	if ((fromId != -1) && ((startTime == numeric_limits<time_t>::max()) && (endTime == numeric_limits<time_t>::max())))
-	{
-		if (limit == -1)
-			return getAggTrades(result, symbol.c_str(), fromId);
 
-		return getAggTrades(result, symbol.c_str(), fromId, limit);
+	checkSymbol(symbol, result);
+	if (result != "")
+		return binanceSuccess;
+	
+	if ((fromId != "") && ((startTime == "") && (endTime == "")))
+	{
+		int fromIdValue;
+		checkInteger("fromId", fromId, fromIdValue, result);
+		if (result != "")
+			return binanceSuccess;		
+	
+		if (limit == "")
+			return getAggTrades(result, symbol.c_str(), fromIdValue);
+
+		int limitValue;
+		checkInteger("limit", limit, limitValue, result);
+		if (result != "")
+			return binanceSuccess;		
+
+		return getAggTrades(result, symbol.c_str(), fromIdValue, limitValue);
 	}
 	
-	if ((fromId == -1) && ((startTime != numeric_limits<time_t>::max()) && (endTime != numeric_limits<time_t>::max())))
+	if ((fromId == "") && ((startTime != "") && (endTime != "")))
 	{
-		if (limit == -1)
-			return getAggTrades(result, symbol.c_str(), startTime, endTime);
+		int startTimeValue;
+		checkInteger("startTime", startTime, startTimeValue, result);
+		if (result != "")
+			return binanceSuccess;
+
+		int endTimeValue;
+		checkInteger("endTime", endTime, endTimeValue, result);
+		if (result != "")
+			return binanceSuccess;
+
+		if (limit == "")
+			return getAggTrades(result, symbol.c_str(), startTimeValue, endTimeValue);
+
+		int limitValue;
+		checkInteger("limit", limit, limitValue, result);
+		if (result != "")
+			return binanceSuccess;
 	
-		return getAggTrades(result, symbol.c_str(), startTime, endTime, limit);
+		return getAggTrades(result, symbol.c_str(), startTimeValue, endTimeValue, limitValue);
+	}
+
+	if ((fromId == "") && ((startTime == "") && (endTime == "")))
+	{
+		int limitValue;
+		checkInteger("limit", limit, limitValue, result);
+		if (result != "")
+			return binanceSuccess;		
+
+		return getAggTrades(result, symbol.c_str(), limitValue);
 	}
 
 	result = "{\"code\":-1128,\"msg\":\"Combination of optional parameters invalid.\"}";
@@ -358,77 +372,34 @@ binanceError_t binance::Market::getDepth(string& result, const vector<pair<strin
 	}
 
 	string symbol = "";
-	int limit = -1;
+	string limit = "";
 
-	int hasUnknownArgs = 0;
+	map<string, string> unknownArgs;
 	for (int i = 0, e = args.size(); i != e; i++)
 	{
-		const pair<string, string> arg = args[i];
-	
+		const pair<string, string>& arg = args[i];
+
 		if (arg.first == "symbol")
 		{
-			if (symbol != "")
-			{
-				result = "{\"code\":-1101,\"msg\":\"Duplicate values for a parameter detected.\"}";
+			readValue(arg, symbol, result);
+			if (result != "")
 				return binanceSuccess;
-			}
-
-			while (1)
-			{
-				if (arg.second.size() > 20) goto failure4;
-
-				for (int i = 0, e = arg.second.size(); i != e; i++)
-				{
-					if ((isupper(arg.second[i])) || (isdigit(arg.second[i])))
-						continue;
-			
-					goto failure4;
-				}
-		
-				break;
-		
-			failure4 :
-		
-				result = "{\"code\":-1100,\"msg\":\"Illegal characters found in parameter 'symbol'; "
-					"legal range is '^[A-Z0-9_]{1,20}$'.\"}";
-				return binanceSuccess;
-			}
-			
-			symbol = arg.second; 
 		}
 		else if (arg.first == "limit")
 		{
-			if (limit != -1)
+			readValue(arg, limit, result);
+			if (result != "")
+				return binanceSuccess;
+		}	
+		else
+		{
+			if (unknownArgs[arg.first] != "")
 			{
 				result = "{\"code\":-1101,\"msg\":\"Duplicate values for a parameter detected.\"}";
 				return binanceSuccess;
 			}
-
-			while (1)
-			{
-				if (arg.second.size() > 20) goto failure5;
-
-				for (int i = 0, e = arg.second.size(); i != e; i++)
-				{
-					if (isdigit(arg.second[i]))
-						continue;
 			
-					goto failure5;
-				}
-		
-				if ((stringstream(arg.second) >> limit))
-					break;
-		
-			failure5 :
-		
-				result = "{\"code\":-1100,\"msg\":\"Illegal characters found in parameter 'limit'; "
-					"legal range is '^[0-9]{1,20}$'.\"}";
-				return binanceSuccess;
-			}
-		}
-		else
-		{
-			hasUnknownArgs++;
+			unknownArgs[arg.first] = arg.second;
 		}
 	}
 
@@ -438,11 +409,11 @@ binanceError_t binance::Market::getDepth(string& result, const vector<pair<strin
 		return binanceSuccess;
 	}
 
-	if (hasUnknownArgs)
+	if (unknownArgs.size())
 	{
 		stringstream ss;
 		ss << "{\"code\":-1104,\"msg\":\"Not all sent parameters were read; read '";
-		ss << args.size() - hasUnknownArgs;
+		ss << args.size() - unknownArgs.size();
 		ss << "' parameter(s) but was sent '";
 		ss << args.size();
 		ss << "'.\"}";
@@ -450,10 +421,19 @@ binanceError_t binance::Market::getDepth(string& result, const vector<pair<strin
 		return binanceSuccess;
 	}
 	
-	if (limit == -1)
+	checkSymbol(symbol, result);
+	if (result != "")
+		return binanceSuccess;
+	
+	if (limit == "")
 		return getDepth(result, symbol.c_str());
 
-	return getDepth(result, symbol.c_str(), limit);
+	int limitValue;
+	checkInteger("limit", limit, limitValue, result);
+	if (result != "")
+		return binanceSuccess;
+
+	return getDepth(result, symbol.c_str(), limitValue);
 }
 
 // Get Market Depth
@@ -479,83 +459,54 @@ binanceError_t binance::Market::getKlines(string& result, const vector<pair<stri
 
 	string symbol = "";
 	string interval = "";
-	int limit = -1;
-	time_t startTime = numeric_limits<time_t>::max();
-	time_t endTime = numeric_limits<time_t>::max();
+	string limit = "";
+	string startTime = "";
+	string endTime = "";
 
-	int hasUnknownArgs = 0;
+	map<string, string> unknownArgs;
 	for (int i = 0, e = args.size(); i != e; i++)
 	{
-		const pair<string, string> arg = args[i];
-	
+		const pair<string, string>& arg = args[i];
+
 		if (arg.first == "symbol")
 		{
-			if (symbol != "")
-			{
-				result = "{\"code\":-1101,\"msg\":\"Duplicate values for a parameter detected.\"}";
+			readValue(arg, symbol, result);
+			if (result != "")
 				return binanceSuccess;
-			}
-			
-			symbol = arg.second; 
 		}
 		else if (arg.first == "interval")
 		{
-			if (interval != "")
+			readValue(arg, interval, result);
+			if (result != "")
+				return binanceSuccess;
+		}
+		else if (arg.first == "limit")
+		{
+			readValue(arg, limit, result);
+			if (result != "")
+				return binanceSuccess;
+		}	
+		else if (arg.first == "startTime")
+		{
+			readValue(arg, startTime, result);
+			if (result != "")
+				return binanceSuccess;
+		}
+		else if (arg.first == "endTime")
+		{
+			readValue(arg, endTime, result);
+			if (result != "")
+				return binanceSuccess;
+		}	
+		else
+		{
+			if (unknownArgs[arg.first] != "")
 			{
 				result = "{\"code\":-1101,\"msg\":\"Duplicate values for a parameter detected.\"}";
 				return binanceSuccess;
 			}
 			
-			interval = arg.second; 
-		}
-		else if (arg.first == "limit")
-		{
-			if (limit != -1)
-			{
-				result = "{\"code\":-1101,\"msg\":\"Duplicate values for a parameter detected.\"}";
-				return binanceSuccess;
-			}
-
-			if (!(stringstream(arg.second) >> limit))
-			{
-				result = "{\"code\":-1100,\"msg\":\"Illegal characters found in parameter 'limit'; "
-					"legal range is '^[0-9]{1,20}$'.\"}";
-				return binanceSuccess;
-			}
-		}
-		else if (arg.first == "startTime")
-		{
-			if (startTime != numeric_limits<time_t>::max())
-			{
-				result = "{\"code\":-1101,\"msg\":\"Duplicate values for a parameter detected.\"}";
-				return binanceSuccess;
-			}
-
-			if (!(stringstream(arg.second) >> startTime))
-			{
-				result = "{\"code\":-1100,\"msg\":\"Illegal characters found in parameter 'startTime'; "
-					" legal range is '^[0-9]{1,20}$'.\"}";
-				return binanceSuccess;
-			}
-		}
-		else if (arg.first == "endTime")
-		{
-			if (endTime != numeric_limits<time_t>::max())
-			{
-				result = "{\"code\":-1101,\"msg\":\"Duplicate values for a parameter detected.\"}";
-				return binanceSuccess;
-			}
-
-			if (!(stringstream(arg.second) >> endTime))
-			{
-				result = "{\"code\":-1100,\"msg\":\"Illegal characters found in parameter 'endTime'; "
-					" legal range is '^[0-9]{1,20}$'.\"}";
-				return binanceSuccess;
-			}
-		}
-		else
-		{
-			hasUnknownArgs++;
+			unknownArgs[arg.first] = arg.second;
 		}
 	}
 
@@ -571,32 +522,60 @@ binanceError_t binance::Market::getKlines(string& result, const vector<pair<stri
 		return binanceSuccess;
 	}
 	
-	if (hasUnknownArgs)
+	if (unknownArgs.size())
 	{
 		stringstream ss;
 		ss << "{\"code\":-1104,\"msg\":\"Not all sent parameters were read; read '";
-		ss << args.size() - hasUnknownArgs;
+		ss << args.size() - unknownArgs.size();
 		ss << "' parameter(s) but was sent '";
 		ss << args.size();
 		ss << "'.\"}";
 		result = ss.str();
 		return binanceSuccess;
 	}
+
+	checkSymbol(symbol, result);
+	if (result != "")
+		return binanceSuccess;
 	
-	if ((startTime != numeric_limits<time_t>::max()) && (endTime != numeric_limits<time_t>::max()))
+	if ((interval == "") && (startTime != "") && (endTime != ""))
 	{
-		if (limit == -1)
-			return getKlines(result, symbol.c_str(), interval.c_str(), startTime, endTime);
+		int startTimeValue;
+		checkInteger("startTime", startTime, startTimeValue, result);
+		if (result != "")
+			return binanceSuccess;
+
+		int endTimeValue;
+		checkInteger("endTime", endTime, endTimeValue, result);
+		if (result != "")
+			return binanceSuccess;
+
+		if (limit == "")
+			return getKlines(result, symbol.c_str(), interval.c_str(), startTimeValue, endTimeValue);
+
+		int limitValue;
+		checkInteger("limit", limit, limitValue, result);
+		if (result != "")
+			return binanceSuccess;
 	
-		return getKlines(result, symbol.c_str(), interval.c_str(), startTime, endTime, limit);
+		return getKlines(result, symbol.c_str(), interval.c_str(), startTimeValue, endTimeValue, limitValue);
 	}
 	
-	if ((startTime == numeric_limits<time_t>::max()) && (endTime == numeric_limits<time_t>::max()))
+	if ((interval != "") && (startTime == "") && (endTime == ""))
 	{
-		if (limit == -1)
+		checkInterval(interval, result);
+		if (result != "")
+			return binanceSuccess;
+
+		if (limit == "")
 			return getKlines(result, symbol.c_str(), interval.c_str());
 
-		return getKlines(result, symbol.c_str(), interval.c_str(), limit);
+		int limitValue;
+		checkInteger("limit", limit, limitValue, result);
+		if (result != "")
+			return binanceSuccess;
+
+		return getKlines(result, symbol.c_str(), interval.c_str(), limitValue);
 	}
 
 	result = "{\"code\":-1128,\"msg\":\"Combination of optional parameters invalid.\"}";

@@ -55,6 +55,9 @@ static const string marketErrors[][2] =
 	{ "1/ticker/24hr?limit=1",
 	  "{\"code\":-1104,\"msg\":\"Not all sent parameters were read; read '0' parameter(s) but was sent '1'.\"}" },
 	
+	{ "1/ticker/24hr?limit=1&limit=2",
+	  "{\"code\":-1101,\"msg\":\"Duplicate values for a parameter detected.\"}" },
+	
 	{ "1/ticker/24hr?symbola=BNBBTC",
 	  "{\"code\":-1104,\"msg\":\"Not all sent parameters were read; read '0' parameter(s) but was sent '1'.\"}" },
 
@@ -120,9 +123,9 @@ TEST(market, errors)
 			Json::Value jsonActualResult;
 			EXPECT_NO_THROW(reader.parse(result, jsonActualResult));
 
-printf("test = %s\n", marketError[0].c_str());
-printf("result = %s\n", result.c_str());
-printf("expected = %s\n", marketError[1].c_str());
+			printf("test = %s\n", marketError[0].c_str());
+			printf("result = %s\n", result.c_str());
+			printf("expected = %s\n", marketError[1].c_str());
 
 			Json::Value jsonExpectedResult;
 			EXPECT_NO_THROW(reader.parse(marketError[1], jsonExpectedResult));

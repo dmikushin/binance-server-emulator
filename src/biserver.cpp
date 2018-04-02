@@ -17,11 +17,6 @@ const char APIprefix[] = "/api/v";
 using namespace binance;
 using namespace std;
 
-static bool startsWith(const string& what, const string& with)
-{
-	return (what.compare(0, with.length(), with) == 0);
-}
-
 static int callback_arguments(void *cls, enum MHD_ValueKind kind, const char *key, const char *value)
 {
 	vector<pair<string, string> >* args = (vector<pair<string, string> >*)cls;
@@ -127,11 +122,11 @@ static int callback(void* cls, struct MHD_Connection* connection,
 				result = ss.str();
 			}
 		}
-		else if (startsWith(url, "1/ticker/24hr"))
+		else if (url == "1/ticker/24hr")
 		{
 			BINANCE_ERR_CHECK(binance::Market::get24hr(result, args));
 		}
-		else if (startsWith(url, "1/aggTrades"))
+		else if (url == "1/aggTrades")
 		{
 			BINANCE_ERR_CHECK(binance::Market::getAggTrades(result, args));
 		}
@@ -143,23 +138,23 @@ static int callback(void* cls, struct MHD_Connection* connection,
 		{
 			BINANCE_ERR_CHECK(binance::Market::getAllPrices(result));
 		}
-		else if (startsWith(url, "1/depth"))
+		else if (url == "1/depth")
 		{
 			BINANCE_ERR_CHECK(binance::Market::getDepth(result, args));
 		}
-		else if (startsWith(url, "1/historicalTrades"))
+		else if (url == "1/historicalTrades")
 		{
 			BINANCE_ERR_CHECK(binance::Account::getHistoricalTrades(result, args, headers));
 		}
-		else if (startsWith(url, "1/klines"))
+		else if (url == "1/klines")
 		{
 			BINANCE_ERR_CHECK(binance::Market::getKlines(result, args));
 		}
-		else if (startsWith(url, "1/trades"))
+		else if (url == "1/trades")
 		{
 			BINANCE_ERR_CHECK(binance::Account::getTrades(result, args, headers));
 		}
-		else if (startsWith(url, "1/userDataStream"))
+		else if (url == "1/userDataStream")
 		{
 			BINANCE_ERR_CHECK(binance::Account::startUserDataStream(result, headers));
 		}
@@ -170,23 +165,23 @@ static int callback(void* cls, struct MHD_Connection* connection,
 	}
 	else if (url[0] == '3')
 	{
-		if (startsWith(url, "3/account"))
+		if (url == "3/account")
 		{
 			BINANCE_ERR_CHECK(binance::Account::getInfo(result, args, headers));
 		}
-		else if (startsWith(url, "3/allOrders"))
+		else if (url == "3/allOrders")
 		{
 			BINANCE_ERR_CHECK(binance::Account::getAllOrders(result, args, headers));
 		}
-		else if (startsWith(url, "3/myTrades"))
+		else if (url == "3/myTrades")
 		{
 			BINANCE_ERR_CHECK(binance::Account::getTrades(result, args, headers));
 		}
-		else if (startsWith(url, "3/openOrders"))
+		else if (url == "3/openOrders")
 		{
 			BINANCE_ERR_CHECK(binance::Account::getOpenOrders(result, args, headers));
 		}
-		else if (startsWith(url, "3/order"))
+		else if (url == "3/order")
 		{
 			BINANCE_ERR_CHECK(binance::Account::sendOrder(result, args, headers));
 		}
@@ -199,9 +194,6 @@ static int callback(void* cls, struct MHD_Connection* connection,
 	{
 		return result_404(connection);
 	}
-
-/*	result = "<html><head></head><body><pre style=\"word-wrap: break-word; white-space: pre-wrap;\">"
-		+ result + "</pre></body></html>";*/
 
     // Reset when done.
     *ptr = NULL;
