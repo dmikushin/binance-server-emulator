@@ -6,7 +6,7 @@
 #include <sstream>
 
 #include "binance.h"
-#include "timing.h"
+#include "binance_server.h"
 
 #define BINANCE_ERR_CHECK(x) do { \
 	binanceError_t error = x; if (error != binanceSuccess) return MHD_HTTP_BAD_REQUEST; \
@@ -103,24 +103,10 @@ static int callback(void* cls, struct MHD_Connection* connection,
 		if (url == "1/time")
 		{
 			if (args.size() != 0)
-			{
-				stringstream ss;
-				ss << "{\"code\":-1101,\"msg\":\"Too many parameters; expected '";
-				ss << 0;
-				ss << "' and received '";
-				ss << args.size();
-				ss << "'.\"}";
-				result = ss.str();
-			}
-			else
-			{
-				uint64_t value; get_time(&value);
-				stringstream ss;
-				ss << "{\"serverTime\":";
-				ss << value;
-				ss << "}";
-				result = ss.str();
-			}
+				BINANCE_ERR_CHECK(binance::Server::setTime(result, args));
+
+			if (result == "")
+				BINANCE_ERR_CHECK(binance::Server::getTime(result));
 		}
 		else if (url == "1/ticker/24hr")
 		{
@@ -219,7 +205,11 @@ static int biserver(int port)
 		return 1;
 	}
 
+#if defined(TESTING)
+	while (1) usleep(1);
+#else
 	(void)getc(stdin);
+#endif // TESTING
 
 	MHD_stop_daemon(d);
 

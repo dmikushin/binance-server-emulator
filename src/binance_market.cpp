@@ -1,101 +1,10 @@
 #include "binance.h"
+#include "binance_parser.h"
 
-#include <cstring>
-#include <iterator>
-#include <limits>
 #include <map>
-#include <sstream>
 
 using namespace binance;
 using namespace std;
-
-static void readValue(const pair<string, string>& arg, string& value, string& result)
-{
-	if (value != "")
-	{
-		result = "{\"code\":-1101,\"msg\":\"Duplicate values for a parameter detected.\"}";
-		return;
-	}
-	
-	value = arg.second;
-}
-
-static void checkSymbol(const string& symbol, string& result)
-{
-	while (1)
-	{
-		if ((symbol.size() < 1) || (symbol.size() > 20)) goto failure;
-
-		for (int i = 0, e = symbol.size(); i != e; i++)
-		{
-			if ((isupper(symbol[i])) || (isdigit(symbol[i])))
-				continue;
-	
-			goto failure;
-		}
-
-		break;
-
-	failure :
-
-		result = "{\"code\":-1100,\"msg\":\"Illegal characters found in parameter 'symbol'; "
-			"legal range is '^[A-Z0-9_]{1,20}$'.\"}";
-		return;
-	}
-}
-
-static void checkInterval(const string& interval, string& result)
-{
-	const static string validIntervals[] =
-	{
-		"1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d", "3d", "1w", "1M"
-	};
-
-	bool found = false;
-	for (int i = 0, e = sizeof(validIntervals) / sizeof(validIntervals[0]); i < e; i++)
-	{
-		if (interval == validIntervals[i])
-		{
-			found = true;
-			break;
-		}
-	}
-
-	if (!found)
-	{
-		result = "{\"code\":-1120,\"msg\":\"Invalid interval.\"}";
-		return;
-	}
-}	
-
-template<typename T>
-static void checkInteger(const string& sname, const string& svalue, T& value, string& result)
-{
-	while (1)
-	{
-		if ((svalue.size() < 1) || (svalue.size() > 20)) goto failure;
-
-		for (int i = 0, e = svalue.size(); i != e; i++)
-		{
-			if (isdigit(svalue[i]))
-				continue;
-	
-			goto failure;
-		}
-
-		if ((stringstream(svalue) >> value))
-			break;
-
-	failure :
-
-		stringstream ss;
-		ss << "{\"code\":-1100,\"msg\":\"Illegal characters found in parameter '";
-		ss << sname;
-		ss << "'; legal range is '^[0-9]{1,20}$'.\"}";
-		result = ss.str();
-		return;
-	}
-}
 
 binanceError_t binance::Market::get24hr(string& result, const vector<pair<string, string> >& args)
 {
@@ -110,7 +19,7 @@ binanceError_t binance::Market::get24hr(string& result, const vector<pair<string
 
 		if (arg.first == "symbol")
 		{
-			readValue(arg, symbol, result);
+			Parser::readValue(arg, symbol, result);
 			if (result != "")
 				return binanceSuccess;
 		}
@@ -148,7 +57,7 @@ binanceError_t binance::Market::get24hr(string& result, const vector<pair<string
 		return binanceSuccess;
 	}
 
-	checkSymbol(symbol, result);
+	Parser::checkSymbol(symbol, result);
 	if (result != "")
 		return binanceSuccess;
 
@@ -179,12 +88,6 @@ binanceError_t binance::Market::get24hr(string& result, const char *symbol)
 
 binanceError_t binance::Market::getAggTrades(string& result, const vector<pair<string, string> >& args)
 {
-	if (args.size() == 0)
-	{
-		result = "{\"code\":-1102,\"msg\":\"Mandatory parameter 'symbol' was not sent, was empty/null, or malformed.\"}";
-		return binanceSuccess;
-	}
-
 	string symbol = "";
 	string fromId = "";
 	string limit = "";
@@ -198,31 +101,31 @@ binanceError_t binance::Market::getAggTrades(string& result, const vector<pair<s
 
 		if (arg.first == "symbol")
 		{
-			readValue(arg, symbol, result);
+			Parser::readValue(arg, symbol, result);
 			if (result != "")
 				return binanceSuccess;
 		}	
 		else if (arg.first == "fromId")
 		{
-			readValue(arg, fromId, result);
+			Parser::readValue(arg, fromId, result);
 			if (result != "")
 				return binanceSuccess;
 		}	
 		else if (arg.first == "limit")
 		{
-			readValue(arg, limit, result);
+			Parser::readValue(arg, limit, result);
 			if (result != "")
 				return binanceSuccess;
 		}	
 		else if (arg.first == "startTime")
 		{
-			readValue(arg, startTime, result);
+			Parser::readValue(arg, startTime, result);
 			if (result != "")
 				return binanceSuccess;
 		}	
 		else if (arg.first == "endTime")
 		{
-			readValue(arg, endTime, result);
+			Parser::readValue(arg, endTime, result);
 			if (result != "")
 				return binanceSuccess;
 		}	
@@ -256,14 +159,14 @@ binanceError_t binance::Market::getAggTrades(string& result, const vector<pair<s
 		return binanceSuccess;
 	}
 
-	checkSymbol(symbol, result);
+	Parser::checkSymbol(symbol, result);
 	if (result != "")
 		return binanceSuccess;
 	
 	if ((fromId != "") && ((startTime == "") && (endTime == "")))
 	{
 		int fromIdValue;
-		checkInteger("fromId", fromId, fromIdValue, result);
+		Parser::parsePositiveInteger("fromId", fromId, fromIdValue, result);
 		if (result != "")
 			return binanceSuccess;		
 	
@@ -271,7 +174,7 @@ binanceError_t binance::Market::getAggTrades(string& result, const vector<pair<s
 			return getAggTrades(result, symbol.c_str(), fromIdValue);
 
 		int limitValue;
-		checkInteger("limit", limit, limitValue, result);
+		Parser::parsePositiveInteger("limit", limit, limitValue, result);
 		if (result != "")
 			return binanceSuccess;		
 
@@ -281,12 +184,12 @@ binanceError_t binance::Market::getAggTrades(string& result, const vector<pair<s
 	if ((fromId == "") && ((startTime != "") && (endTime != "")))
 	{
 		int startTimeValue;
-		checkInteger("startTime", startTime, startTimeValue, result);
+		Parser::parsePositiveInteger("startTime", startTime, startTimeValue, result);
 		if (result != "")
 			return binanceSuccess;
 
 		int endTimeValue;
-		checkInteger("endTime", endTime, endTimeValue, result);
+		Parser::parsePositiveInteger("endTime", endTime, endTimeValue, result);
 		if (result != "")
 			return binanceSuccess;
 
@@ -294,7 +197,7 @@ binanceError_t binance::Market::getAggTrades(string& result, const vector<pair<s
 			return getAggTrades(result, symbol.c_str(), startTimeValue, endTimeValue);
 
 		int limitValue;
-		checkInteger("limit", limit, limitValue, result);
+		Parser::parsePositiveInteger("limit", limit, limitValue, result);
 		if (result != "")
 			return binanceSuccess;
 	
@@ -304,7 +207,7 @@ binanceError_t binance::Market::getAggTrades(string& result, const vector<pair<s
 	if ((fromId == "") && ((startTime == "") && (endTime == "")))
 	{
 		int limitValue;
-		checkInteger("limit", limit, limitValue, result);
+		Parser::parsePositiveInteger("limit", limit, limitValue, result);
 		if (result != "")
 			return binanceSuccess;		
 
@@ -365,12 +268,6 @@ binanceError_t binance::Market::getAllPrices(string& result)
 // GET /api/v1/ticker/allBookTickers
 binanceError_t binance::Market::getDepth(string& result, const vector<pair<string, string> >& args)
 {
-	if (args.size() == 0)
-	{
-		result = "{\"code\":-1102,\"msg\":\"Mandatory parameter 'symbol' was not sent, was empty/null, or malformed.\"}";
-		return binanceSuccess;
-	}
-
 	string symbol = "";
 	string limit = "";
 
@@ -381,13 +278,13 @@ binanceError_t binance::Market::getDepth(string& result, const vector<pair<strin
 
 		if (arg.first == "symbol")
 		{
-			readValue(arg, symbol, result);
+			Parser::readValue(arg, symbol, result);
 			if (result != "")
 				return binanceSuccess;
 		}
 		else if (arg.first == "limit")
 		{
-			readValue(arg, limit, result);
+			Parser::readValue(arg, limit, result);
 			if (result != "")
 				return binanceSuccess;
 		}	
@@ -421,7 +318,7 @@ binanceError_t binance::Market::getDepth(string& result, const vector<pair<strin
 		return binanceSuccess;
 	}
 	
-	checkSymbol(symbol, result);
+	Parser::checkSymbol(symbol, result);
 	if (result != "")
 		return binanceSuccess;
 	
@@ -429,7 +326,7 @@ binanceError_t binance::Market::getDepth(string& result, const vector<pair<strin
 		return getDepth(result, symbol.c_str());
 
 	int limitValue;
-	checkInteger("limit", limit, limitValue, result);
+	Parser::parsePositiveInteger("limit", limit, limitValue, result);
 	if (result != "")
 		return binanceSuccess;
 
@@ -451,12 +348,6 @@ binanceError_t binance::Market::getDepth(string& result, const char *symbol, int
 
 binanceError_t binance::Market::getKlines(string& result, const vector<pair<string, string> >& args)
 {
-	if (args.size() == 0)
-	{
-		result = "{\"code\":-1102,\"msg\":\"Mandatory parameter 'symbol' was not sent, was empty/null, or malformed.\"}";
-		return binanceSuccess;
-	}
-
 	string symbol = "";
 	string interval = "";
 	string limit = "";
@@ -470,31 +361,31 @@ binanceError_t binance::Market::getKlines(string& result, const vector<pair<stri
 
 		if (arg.first == "symbol")
 		{
-			readValue(arg, symbol, result);
+			Parser::readValue(arg, symbol, result);
 			if (result != "")
 				return binanceSuccess;
 		}
 		else if (arg.first == "interval")
 		{
-			readValue(arg, interval, result);
+			Parser::readValue(arg, interval, result);
 			if (result != "")
 				return binanceSuccess;
 		}
 		else if (arg.first == "limit")
 		{
-			readValue(arg, limit, result);
+			Parser::readValue(arg, limit, result);
 			if (result != "")
 				return binanceSuccess;
 		}	
 		else if (arg.first == "startTime")
 		{
-			readValue(arg, startTime, result);
+			Parser::readValue(arg, startTime, result);
 			if (result != "")
 				return binanceSuccess;
 		}
 		else if (arg.first == "endTime")
 		{
-			readValue(arg, endTime, result);
+			Parser::readValue(arg, endTime, result);
 			if (result != "")
 				return binanceSuccess;
 		}	
@@ -534,19 +425,19 @@ binanceError_t binance::Market::getKlines(string& result, const vector<pair<stri
 		return binanceSuccess;
 	}
 
-	checkSymbol(symbol, result);
+	Parser::checkSymbol(symbol, result);
 	if (result != "")
 		return binanceSuccess;
 	
 	if ((interval == "") && (startTime != "") && (endTime != ""))
 	{
 		int startTimeValue;
-		checkInteger("startTime", startTime, startTimeValue, result);
+		Parser::parsePositiveInteger("startTime", startTime, startTimeValue, result);
 		if (result != "")
 			return binanceSuccess;
 
 		int endTimeValue;
-		checkInteger("endTime", endTime, endTimeValue, result);
+		Parser::parsePositiveInteger("endTime", endTime, endTimeValue, result);
 		if (result != "")
 			return binanceSuccess;
 
@@ -554,7 +445,7 @@ binanceError_t binance::Market::getKlines(string& result, const vector<pair<stri
 			return getKlines(result, symbol.c_str(), interval.c_str(), startTimeValue, endTimeValue);
 
 		int limitValue;
-		checkInteger("limit", limit, limitValue, result);
+		Parser::parsePositiveInteger("limit", limit, limitValue, result);
 		if (result != "")
 			return binanceSuccess;
 	
@@ -563,7 +454,7 @@ binanceError_t binance::Market::getKlines(string& result, const vector<pair<stri
 	
 	if ((interval != "") && (startTime == "") && (endTime == ""))
 	{
-		checkInterval(interval, result);
+		Parser::checkInterval(interval, result);
 		if (result != "")
 			return binanceSuccess;
 
@@ -571,7 +462,7 @@ binanceError_t binance::Market::getKlines(string& result, const vector<pair<stri
 			return getKlines(result, symbol.c_str(), interval.c_str());
 
 		int limitValue;
-		checkInteger("limit", limit, limitValue, result);
+		Parser::parsePositiveInteger("limit", limit, limitValue, result);
 		if (result != "")
 			return binanceSuccess;
 

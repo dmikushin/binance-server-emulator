@@ -20,11 +20,12 @@ find_package(LibWebSockets REQUIRED)
 find_package(JsonCpp REQUIRED)
 find_package(MHD REQUIRED)
 find_package(Threads REQUIRED)
+find_package(OpenSSL REQUIRED)
 
 file(GLOB_RECURSE BINARY_SRC "src/*.cpp" "include/*.h")
 
 add_executable(biserver ${BINARY_SRC})
-target_link_libraries(biserver microhttpd)
+target_link_libraries(biserver microhttpd curl)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
@@ -56,5 +57,5 @@ include_directories("${source_dir}/googletest/include")
 
 add_executable(biserver_test ${BINARY_SRC})
 target_compile_definitions(biserver_test PUBLIC TESTING)
-target_link_libraries(biserver_test microhttpd libgtest jsoncpp curl websockets pthread)
+target_link_libraries(biserver_test microhttpd libgtest jsoncpp curl websockets pthread ${OPENSSL_CRYPTO_LIBRARY})
 
